@@ -1,8 +1,9 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { formatNumber, getFinalRank, getScoreInfo } from '../utils/scoring'
-import { prompts } from '../data/prompts'
+import { submitScore, getTodayLeaderboard } from '../lib/supabase'
 
-export default function ResultsScreen({ answers, onRestart }) {
+export default function ResultsScreen({ answers, prompts, onRestart }) {
   const totalScore = answers.reduce((sum, a) => sum + a.score, 0)
   const maxScore = answers.length * 100
   const pct = Math.round((totalScore / maxScore) * 100)
@@ -10,6 +11,39 @@ export default function ResultsScreen({ answers, onRestart }) {
 
   const best = answers.reduce((a, b) => (a.score > b.score ? a : b), answers[0])
   const worst = answers.reduce((a, b) => (a.score < b.score ? a : b), answers[0])
+
+  const [name, setName] = useState('')
+  const [submitState, setSubmitState] = useState('idle') // idle | loading | done | error
+  const [leaderboard, setLeaderboard] = useState([])
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
+
+  const loadLeaderboard = async () => {
+    setLeaderboardLoading(true)
+    try {
+      const data = await getTodayLeaderboard()
+      setLeaderboard(data || [])
+    } catch {
+      // silently fail — leaderboard is non-critical
+    } finally {
+      setLeaderboardLoading(false)
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (!name.trim()) return
+    setSubmitState('loading')
+    try {
+      await submitScore(name.trim(), totalScore, maxScore)
+      setSubmitState('done')
+      loadLeaderboard()
+    } catch {
+      setSubmitState('error')
+    }
+  }
+
+  useEffect(() => {
+    loadLeaderboard()
+  }, [])
 
   return (
     <div className="min-h-screen relative overflow-x-hidden">
@@ -83,11 +117,81 @@ export default function ResultsScreen({ answers, onRestart }) {
           })}
         </motion.div>
 
-        {/* Breakdown */}
+        {/* Submit to leaderboard */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-5"
+        >
+          <h2 className="text-gray-300 font-semibold text-sm mb-3">Submit to Today's Leaderboard</h2>
+          {submitState === 'done' ? (
+            <p className="text-emerald-400 text-sm font-medium">Score submitted! See your ranking below.</p>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                placeholder="Your name"
+                maxLength={24}
+                className="flex-1 bg-white/8 border border-white/15 rounded-xl px-3 py-2 text-white text-sm placeholder-gray-600 outline-none focus:border-amber-400/50"
+              />
+              <button
+                onClick={handleSubmit}
+                disabled={!name.trim() || submitState === 'loading'}
+                className="bg-amber-400 hover:bg-amber-300 disabled:opacity-40 disabled:cursor-not-allowed text-gray-950 font-bold text-sm px-4 py-2 rounded-xl transition-colors"
+              >
+                {submitState === 'loading' ? '...' : 'Submit'}
+              </button>
+            </div>
+          )}
+          {submitState === 'error' && (
+            <p className="text-red-400 text-xs mt-2">Failed to submit. Check your connection.</p>
+          )}
+        </motion.div>
+
+        {/* Leaderboard */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.45 }}
+          className="mb-5"
+        >
+          <h2 className="text-gray-600 text-xs uppercase tracking-wider mb-3">Today's Top 10</h2>
+          {leaderboardLoading ? (
+            <div className="text-gray-600 text-sm text-center py-4">Loading...</div>
+          ) : leaderboard.length === 0 ? (
+            <div className="text-gray-600 text-sm text-center py-4">No scores yet today — be the first!</div>
+          ) : (
+            <div className="space-y-1.5">
+              {leaderboard.map((entry, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2 border ${
+                    entry.player_name === name && submitState === 'done'
+                      ? 'bg-amber-400/10 border-amber-400/30'
+                      : 'bg-white/4 border-white/8'
+                  }`}
+                >
+                  <span className={`text-xs font-bold w-5 shrink-0 ${i === 0 ? 'text-amber-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-700' : 'text-gray-600'}`}>
+                    #{i + 1}
+                  </span>
+                  <span className="flex-1 text-gray-300 text-sm truncate">{entry.player_name}</span>
+                  <span className="text-amber-400 font-bold text-sm tabular-nums">{entry.score}</span>
+                  <span className="text-gray-600 text-xs">/{entry.max_score}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+
+        {/* Breakdown */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
           className="mb-8"
         >
           <h2 className="text-gray-600 text-xs uppercase tracking-wider mb-3">All questions</h2>
@@ -121,13 +225,13 @@ export default function ResultsScreen({ answers, onRestart }) {
         <motion.button
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.65 }}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
           onClick={onRestart}
           className="w-full bg-amber-400 hover:bg-amber-300 text-gray-950 font-bold text-lg py-4 rounded-2xl shadow-lg shadow-amber-400/20 transition-colors"
         >
-          Play Again 🎯
+          Play Again
         </motion.button>
       </div>
     </div>

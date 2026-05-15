@@ -5,19 +5,30 @@ import CardDeck from './components/CardDeck'
 import ResultsScreen from './components/ResultsScreen'
 import { prompts } from './data/prompts'
 
+const QUESTIONS_PER_ROUND = 10
+
+function pickRandom(arr, n) {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, n)
+}
+
 export default function App() {
   const [phase, setPhase] = useState('welcome')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState([])
+  const [gamePrompts, setGamePrompts] = useState([])
 
-  const handleStart = () => setPhase('playing')
+  const handleStart = () => {
+    setGamePrompts(pickRandom(prompts, QUESTIONS_PER_ROUND))
+    setPhase('playing')
+  }
 
   const handleAnswer = (promptId, guess, score) => {
     setAnswers((prev) => [...prev, { promptId, guess, score }])
   }
 
   const handleNext = () => {
-    if (currentIndex >= prompts.length - 1) {
+    if (currentIndex >= gamePrompts.length - 1) {
       setPhase('results')
     } else {
       setCurrentIndex((i) => i + 1)
@@ -28,6 +39,7 @@ export default function App() {
     setPhase('welcome')
     setCurrentIndex(0)
     setAnswers([])
+    setGamePrompts([])
   }
 
   return (
@@ -35,15 +47,15 @@ export default function App() {
       <AnimatePresence mode="wait">
         {phase === 'welcome' && (
           <motion.div key="welcome" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <WelcomeScreen onStart={handleStart} totalQuestions={prompts.length} />
+            <WelcomeScreen onStart={handleStart} totalQuestions={QUESTIONS_PER_ROUND} />
           </motion.div>
         )}
         {phase === 'playing' && (
           <motion.div key="playing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <CardDeck
-              prompt={prompts[currentIndex]}
+              prompt={gamePrompts[currentIndex]}
               currentIndex={currentIndex}
-              total={prompts.length}
+              total={gamePrompts.length}
               onAnswer={handleAnswer}
               onNext={handleNext}
             />
@@ -51,7 +63,7 @@ export default function App() {
         )}
         {phase === 'results' && (
           <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <ResultsScreen answers={answers} onRestart={handleRestart} />
+            <ResultsScreen answers={answers} prompts={gamePrompts} onRestart={handleRestart} />
           </motion.div>
         )}
       </AnimatePresence>
