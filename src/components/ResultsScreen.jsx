@@ -14,6 +14,7 @@ export default function ResultsScreen({ answers, prompts, onRestart }) {
 
   const [name, setName] = useState('')
   const [submitState, setSubmitState] = useState('idle') // idle | loading | done | error
+  const [submitError, setSubmitError] = useState('')
   const [leaderboard, setLeaderboard] = useState([])
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
 
@@ -36,7 +37,8 @@ export default function ResultsScreen({ answers, prompts, onRestart }) {
       await submitScore(name.trim(), totalScore, maxScore)
       setSubmitState('done')
       loadLeaderboard()
-    } catch {
+    } catch (err) {
+      setSubmitError(err?.message ?? String(err))
       setSubmitState('error')
     }
   }
@@ -136,7 +138,7 @@ export default function ResultsScreen({ answers, prompts, onRestart }) {
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
                 placeholder="Your name"
                 maxLength={24}
-                className="flex-1 bg-white/8 border border-white/15 rounded-xl px-3 py-2 text-white text-sm placeholder-gray-600 outline-none focus:border-amber-400/50"
+                className="flex-1 bg-gray-100 border border-gray-300 rounded-xl px-3 py-2 text-gray-900 text-sm placeholder-gray-400 outline-none focus:border-amber-500"
               />
               <button
                 onClick={handleSubmit}
@@ -148,7 +150,7 @@ export default function ResultsScreen({ answers, prompts, onRestart }) {
             </div>
           )}
           {submitState === 'error' && (
-            <p className="text-red-400 text-xs mt-2">Failed to submit. Check your connection.</p>
+            <p className="text-red-400 text-xs mt-2 break-all">Error: {submitError || 'Unknown error'}</p>
           )}
         </motion.div>
 
