@@ -13,12 +13,26 @@ export async function submitScore(playerName, score, maxScore) {
 }
 
 export async function getTodayLeaderboard() {
-  const today = new Date().toISOString().split('T')[0]
+  // Use local midnight so the daily reset matches the user's timezone
+  const now = new Date()
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+  const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
+
   const { data, error } = await supabase
     .from('scores')
     .select('player_name, score, max_score, created_at')
-    .gte('created_at', `${today}T00:00:00`)
-    .lte('created_at', `${today}T23:59:59`)
+    .gte('created_at', startOfDay)
+    .lt('created_at', startOfTomorrow)
+    .order('score', { ascending: false })
+    .limit(10)
+  if (error) throw error
+  return data
+}
+
+export async function getAllTimeLeaderboard() {
+  const { data, error } = await supabase
+    .from('scores')
+    .select('player_name, score, max_score, created_at')
     .order('score', { ascending: false })
     .limit(10)
   if (error) throw error

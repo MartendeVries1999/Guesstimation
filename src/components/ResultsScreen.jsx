@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { formatNumber, getFinalRank, getScoreInfo } from '../utils/scoring'
-import { submitScore, getTodayLeaderboard } from '../lib/supabase'
+import { submitScore, getTodayLeaderboard, getAllTimeLeaderboard } from '../lib/supabase'
 
 export default function ResultsScreen({ answers, prompts, onRestart }) {
   const totalScore = answers.reduce((sum, a) => sum + a.score, 0)
@@ -16,18 +16,24 @@ export default function ResultsScreen({ answers, prompts, onRestart }) {
   const [name, setName] = useState('')
   const [submitState, setSubmitState] = useState('idle') // idle | loading | done | error
   const [submitError, setSubmitError] = useState('')
-  const [leaderboard, setLeaderboard] = useState([])
-  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
+  const [tab, setTab] = useState('today') // today | alltime
+  const [todayBoard, setTodayBoard] = useState([])
+  const [allTimeBoard, setAllTimeBoard] = useState([])
+  const [loadingToday, setLoadingToday] = useState(false)
+  const [loadingAllTime, setLoadingAllTime] = useState(false)
 
-  const loadLeaderboard = async () => {
-    setLeaderboardLoading(true)
+  const loadBoards = async () => {
+    setLoadingToday(true)
+    setLoadingAllTime(true)
     try {
-      const data = await getTodayLeaderboard()
-      setLeaderboard(data || [])
+      const [today, allTime] = await Promise.all([getTodayLeaderboard(), getAllTimeLeaderboard()])
+      setTodayBoard(today || [])
+      setAllTimeBoard(allTime || [])
     } catch {
       // silently fail — leaderboard is non-critical
     } finally {
-      setLeaderboardLoading(false)
+      setLoadingToday(false)
+      setLoadingAllTime(false)
     }
   }
 
@@ -37,7 +43,7 @@ export default function ResultsScreen({ answers, prompts, onRestart }) {
     try {
       await submitScore(name.trim(), totalScore, maxScore)
       setSubmitState('done')
-      loadLeaderboard()
+      loadBoards()
     } catch (err) {
       setSubmitError(err?.message ?? String(err))
       setSubmitState('error')
@@ -45,7 +51,7 @@ export default function ResultsScreen({ answers, prompts, onRestart }) {
   }
 
   useEffect(() => {
-    loadLeaderboard()
+    loadBoards()
   }, [])
 
   return (
@@ -162,31 +168,45 @@ export default function ResultsScreen({ answers, prompts, onRestart }) {
           transition={{ delay: 0.45 }}
           className="mb-5"
         >
-          <h2 className="text-gray-600 text-xs uppercase tracking-wider mb-3">Today's Top 10</h2>
-          {leaderboardLoading ? (
-            <div className="text-gray-600 text-sm text-center py-4">Loading...</div>
-          ) : leaderboard.length === 0 ? (
-            <div className="text-gray-600 text-sm text-center py-4">No scores yet today — be the first!</div>
-          ) : (
-            <div className="space-y-1.5">
-              {leaderboard.map((entry, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2 border ${
-                    entry.player_name === name && submitState === 'done'
-                      ? 'bg-amber-400/10 border-amber-400/30'
-                      : 'bg-white/4 border-white/8'
-                  }`}
-                >
-                  <span className={`text-xs font-bold w-5 shrink-0 ${i === 0 ? 'text-amber-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-700' : 'text-gray-600'}`}>
-                    #{i + 1}
-                  </span>
-                  <span className="flex-1 text-gray-300 text-sm truncate">{entry.player_name}</span>
-                  <span className="text-amber-400 font-bold text-sm tabular-nums">{entry.score}</span>
-                  <span className="text-gray-600 text-xs">/{entry.max_score}</span>
-                </div>
-              ))}
+          {/* Tab header */}
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-gray-600 text-xs uppercase tracking-wider">Leaderboard</h2>
+            <div className="flex gap-1 bg-white/5 rounded-lg p-0.5">
+              <button
+                onClick={() => setTab('today')}
+                className={`text-xs font-semibold px-3 py-1 rounded-md transition-colors ${tab === 'today' ? 'bg-amber-400 text-gray-950' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setTab('alltime')}
+                className={`text-xs font-semibold px-3 py-1 rounded-md transition-colors ${tab === 'alltime' ? 'bg-amber-400 text-gray-950' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                All Time
+              </button>
             </div>
+          </div>
+
+          {/* Today */}
+          {tab === 'today' && (
+            loadingToday ? (
+              <div className="text-gray-600 text-sm text-center py-4">Loading...</div>
+            ) : todayBoard.length === 0 ? (
+              <div className="text-gray-600 text-sm text-center py-4">No scores yet today — be the first!</div>
+            ) : (
+              <LeaderboardList entries={todayBoard} highlightName={submitState === 'done' ? name : ''} />
+            )
+          )}
+
+          {/* All Time */}
+          {tab === 'alltime' && (
+            loadingAllTime ? (
+              <div className="text-gray-600 text-sm text-center py-4">Loading...</div>
+            ) : allTimeBoard.length === 0 ? (
+              <div className="text-gray-600 text-sm text-center py-4">No scores yet — be the first!</div>
+            ) : (
+              <LeaderboardList entries={allTimeBoard} highlightName={submitState === 'done' ? name : ''} />
+            )
           )}
         </motion.div>
 
@@ -240,6 +260,30 @@ export default function ResultsScreen({ answers, prompts, onRestart }) {
           Play Again
         </motion.button>
       </div>
+    </div>
+  )
+}
+
+function LeaderboardList({ entries, highlightName }) {
+  return (
+    <div className="space-y-1.5">
+      {entries.map((entry, i) => (
+        <div
+          key={i}
+          className={`flex items-center gap-3 rounded-xl px-3 py-2 border ${
+            highlightName && entry.player_name === highlightName
+              ? 'bg-amber-400/10 border-amber-400/30'
+              : 'bg-white/4 border-white/8'
+          }`}
+        >
+          <span className={`text-xs font-bold w-5 shrink-0 ${i === 0 ? 'text-amber-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-amber-700' : 'text-gray-600'}`}>
+            #{i + 1}
+          </span>
+          <span className="flex-1 text-gray-300 text-sm truncate">{entry.player_name}</span>
+          <span className="text-amber-400 font-bold text-sm tabular-nums">{entry.score}</span>
+          <span className="text-gray-600 text-xs">/{entry.max_score}</span>
+        </div>
+      ))}
     </div>
   )
 }
