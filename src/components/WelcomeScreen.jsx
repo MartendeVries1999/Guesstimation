@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
 
 const features = [
   { icon: '🧠', label: 'Fermi Questions' },
@@ -63,6 +64,9 @@ export default function WelcomeScreen({ onStart, totalQuestions }) {
 
         <p className="text-gray-700 text-xs mt-4">
           Use k / m / b suffixes for large numbers
+        </p>
+        <p className="text-gray-800 text-xs mt-3">
+          <Link to="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
         </p>
       </motion.div>
     </div>

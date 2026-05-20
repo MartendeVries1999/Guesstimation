@@ -1,8 +1,11 @@
 import { useState } from 'react'
+import { Routes, Route } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import WelcomeScreen from './components/WelcomeScreen'
 import CardDeck from './components/CardDeck'
 import ResultsScreen from './components/ResultsScreen'
+import PrivacyPage from './components/PrivacyPage'
+import CookieBanner from './components/CookieBanner'
 import { prompts } from './data/prompts'
 
 const QUESTIONS_PER_ROUND = 10
@@ -12,7 +15,7 @@ function pickRandom(arr, n) {
   return shuffled.slice(0, n)
 }
 
-export default function App() {
+function Game() {
   const [phase, setPhase] = useState('welcome')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState([])
@@ -68,5 +71,17 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<Game />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+      </Routes>
+      <CookieBanner />
+    </>
   )
 }

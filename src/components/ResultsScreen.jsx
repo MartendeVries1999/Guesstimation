@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { formatNumber, getFinalRank, getScoreInfo } from '../utils/scoring'
 import { submitScore, getTodayLeaderboard } from '../lib/supabase'
 
@@ -224,6 +225,9 @@ export default function ResultsScreen({ answers, prompts, onRestart }) {
         </motion.div>
 
         {/* CTA */}
+        <p className="text-center mb-4">
+          <Link to="/privacy" className="text-gray-700 text-xs hover:text-gray-500 transition-colors">Privacy Policy</Link>
+        </p>
         <motion.button
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
